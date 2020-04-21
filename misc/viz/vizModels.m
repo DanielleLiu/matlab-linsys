@@ -12,7 +12,9 @@ for i=1:length(model)
     [Y2,X2]=fwdSim(U,model{i}.J,model{i}.B,model{i}.C,model{i}.D,[],[],[]);
     model{i}.smoothStates=X2;
     model{i}.smoothOut=Y2;
-    rmfield(model{i},'A'); %Just in case
+    if (isfield(model{i},'A')) %if contains field A, remove it.
+        model{i}=rmfield(model{i},'A'); %Just in case
+    end
 end
 %% Plot STATES
 clear p

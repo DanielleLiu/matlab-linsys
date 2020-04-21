@@ -3,6 +3,7 @@ function [A,B,C,D,Q,R,X,P,bestLL,outLog]=randomStartEM(Y,U,nd,opts)
 %First iter:
 fprintf(['\n Starting rep 0 (short one)... \n']);
 %Pre-process optional flags:
+%get size of u (input) and y (observed output)
 if isa(U,'cell')
   Nu=size(U{1},1);
   ny=size(Y{1},1);
