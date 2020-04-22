@@ -114,8 +114,12 @@ for sub = 1:15
     
     % get alpha positions (for slow leg only since only slow data available).
     alphaSBase = group.adaptData{sub}.getParamInCond({'alphaSlow'},{'TM slow'});
-    alphaSBase = median(alphaSBase(end-44:end-5,:)); %last 40 except last 5.
-    alphaSlow(1:150,:,sub) = zeros(150,1); %the baseline assumes no error signal
+    alphaSBase = nanmedian(alphaSBase(end-44:end-5,:)); %last 40 except last 5.
+    alphaSMidBase = group.adaptData{sub}.getParamInCond({'alphaSlow'},{'TM base'});
+    if (size(alphaSMidBase,1) > 150)
+        alphaSMidBase = alphaSMidBase(end-150:end-1,:); %last 150 except very last one?
+    end
+    alphaSlow(1:150,:,sub) = alphaSMidBase - alphaSBase;%zeros(150,1); %the baseline assumes no error signal
     alphaSAda = group.adaptData{sub}.getParamInCond({'alphaSlow'},{'Adaptation'});
     if (size(alphaSAda,1) > 900)
         alphaSAda = alphaSAda(2:901,:); %last 150 except very last one?
@@ -135,8 +139,12 @@ for sub = 1:15
     
     % get the X positions (for slow, and fast washout since washout the leg swapped).
     xSBase = group.adaptData{sub}.getParamInCond({'XSlow'},{'TM slow'});
-    xSBase = median(xSBase(end-44:end-5,:)); %last 40 except last 5.
-    xSlow(1:150,:,sub) = zeros(150,1); %the baseline assumes no error signal
+    xSBase = nanmedian(xSBase(end-44:end-5,:)); %last 40 except last 5.
+    xslowMidBase = group.adaptData{sub}.getParamInCond({'alphaSlow'},{'TM base'});
+    if (size(xslowMidBase,1) > 150)
+        xslowMidBase = xslowMidBase(end-150:end-1,:); %last 150 except very last one?
+    end
+    xSlow(1:150,:,sub) = xslowMidBase - xSBase;%zeros(150,1); %the baseline assumes no error signal
     xSAda = group.adaptData{sub}.getParamInCond({'XSlow'},{'Adaptation'});
     if (size(xSAda,1) > 900)
         xSAda = xSAda(2:901,:); %last 150 except very last one?
@@ -186,29 +194,34 @@ clear baseData adaData postData ada base washout data i sub aux j newnan nanidx 
 Yf=[median(dataSym{1},3); median(dataSym{2},3);median(dataSym{3},3)]'; %(muscleLabels, 180) x strides
 Uf=[zeros(size(dataSym{1},1),1);ones(size(dataSym{2},1),1);zeros(size(dataSym{3},1),1);]';%0 for B and P, 1 for A, 1 by strides
 
-error = 4;
-if error == 1
-    errorEMGBase = median(dataSym{1}(end-44:end-5,:,:),1); %last 41 except last 5
-    errorEMGBase = {dataSym{1} - errorEMGBase, dataSym{2} - errorEMGBase, dataSym{3} - errorEMGBase};
-    Ue = [zeros(size(dataSym{1},1),1); median(errorEMGBase{2},3);median(errorEMGBase{3},3)]'; %no learning for baseline here
-    Uf=[Uf;Ue]; %[Vasy, deltaEMG] by strides
-elseif error == 2 %StepLengthAsym Base
-    stepLengthAsymMedian = median(stepLengthAsym,3)';
-    Uf = [Uf; stepLengthAsymMedian];
-elseif error == 3 %TrailingLeg Base, alpha
-    Uf = [Uf; median(alphaSlow,3)'];
-elseif error == 4 %LeadingLeg Base, X
-    Uf = [Uf; median(xSlow,3)'];
-end
+errorEMGBase = median(dataSym{1}(end-44:end-5,:,:),1); %last 41 except last 5
+errorEMGBase = {dataSym{1} - errorEMGBase, dataSym{2} - errorEMGBase, dataSym{3} - errorEMGBase};
+Ue = [median(errorEMGBase{1},3); median(errorEMGBase{2},3);median(errorEMGBase{3},3)]'; %no learning for baseline here
+stepLengthAsymMedian = median(stepLengthAsym,3)';
 
-Yf=Yf(:,:); %Using only 400 of Post, use all created for now.
-Uf=Uf(:,:);
-% Just B and A
-Y=Yf(:,1:1050);
-U=Uf(:,1:1050);
+% if error == 1
+%     errorEMGBase = median(dataSym{1}(end-44:end-5,:,:),1); %last 41 except last 5
+%     errorEMGBase = {dataSym{1} - errorEMGBase, dataSym{2} - errorEMGBase, dataSym{3} - errorEMGBase};
+%     Ue = [median(errorEMGBase{1},3); median(errorEMGBase{2},3);median(errorEMGBase{3},3)]'; %no learning for baseline here
+%     Uf=[Uf;Ue]; %[Vasy, deltaEMG] by strides
+% elseif error == 2 %StepLengthAsym Base
+%     stepLengthAsymMedian = median(stepLengthAsym,3)';
+%     Uf = [Uf; stepLengthAsymMedian];
+% elseif error == 3 %TrailingLeg Base, alpha
+%     Uf = [Uf; median(alphaSlow,3)'];
+% elseif error == 4 %LeadingLeg Base, X
+%     Uf = [Uf; median(xSlow,3)'];
+% end
+
+%6 models: flat, Vasym, +EMG, +SLA, +Alpha, + beta
+YAll = {Yf, Yf, Yf, Yf, Yf, Yf}; % the same
+UAll = {Uf,Uf,[Uf;Ue],[Uf; stepLengthAsymMedian],[Uf; median(alphaSlow,3)'],[Uf; median(xSlow,3)']};
+
 clear errorEMGBase stepLengthAsymMedian
 %% Section the dataout to different conditions (not sure for what?)
-
+% Just B and A
+% Y=Yf(:,1:1050);
+% U=Uf(:,1:1050);
 % %% Just P
 % Yp=Yf(:,951:end);
 % Up=Uf(:,951:end);
@@ -219,6 +232,9 @@ clear errorEMGBase stepLengthAsymMedian
 % binw=3;
 % Y2=[medfilt1(median(dataSym{1},3),binw,'truncate'); medfilt1(median(dataSym{2},3),binw,'truncate')]';
 %% Flat model:
+error = 6;
+Yf = YAll{error};
+Uf = UAll{error};
 clear model;
 % [J,B,C,D,Q,R]=getFlatModel(Y,U);
 [J,B,C,D,Q,R]=getFlatModel(Yf,Uf);
@@ -235,6 +251,8 @@ for D1=1:5 %run up to order 5 for now
     opts.fastFlag=true;
     %[fAh,fBh,fCh,D,fQh,R,fXh,fPh]=randomStartEM(Yf,Uf,D1,10,opts); %Slow/true EM
     [fAh,fBh,fCh,D,fQh,R,fXh,fPh]=randomStartEM(Yf,Uf,D1,opts); %Slow/true EM
+    Y=Yf(:,1:1050);
+    U=Uf(:,1:1050);
     logL=dataLogLikelihood(Y,U,fAh,fBh,fCh,D,fQh,R,fXh(:,1),fPh(:,:,1));
     model{D1+1}.runtime=toc;
     %[J,B,C,X,~,Q,P] = canonizev2(fAh,fBh,fCh,fXh,fQh,fPh);
@@ -244,6 +262,37 @@ for D1=1:5 %run up to order 5 for now
 end
 %%
 % save EMrealDimCompare1500mean.mat
+
+%% Compare order 3 across all inputs.
+modelList = {modelVasym{1},modelVasym{4},modelEMG{4},modelSLA{4},modelAlpha{4},modelX{4}};
+[~,res] = vizDataFitAcrossModels(modelList,YAll,UAll);
+%reset legend on the first graph
+subplot(2,1,1);
+legend('Flat','Vasym','EMG','SLA','alpha-slow','X-slow');
+title("Root Mean Square Error of Residuals");
+ylabel("Log RMSE Residuals");
+xlabel("Strides")
+set(gca,'YScale','log');
+set(gca,'YTick',[2e-5,3e-5,4e-5,5e-5,6e-5,7e-5,8e-5,9e-5,1e-4,2e-4],'YTickLabel',...
+    {'2x10^{-5}','3x10^{-5}','4x10^{-5}','5x10^{-5}','6x10^{-5}','7x10^{-5}','8x10^{-5}','9x10^{-5}','1x10^{-4}','2x10^{-4}'});        
+%reset xlabls on the second graph
+subplot(2,1,2);
+set(gca,'XTickLabel',{'Flat','Vasym','EMG','SLA','alpha-slow','X-slow'});
+title('Residual Norm as Percentage of Data Variance');
+
+for i = 1:6
+    resNom(1,i) = sqrt(sum(nansum(res{i}.^2)));
+end
+
+%% Variance in Y
+vYf = var(Yf);
+plot(vYf);
+set(gca, 'XTick',[0,75,150,600,1050,1250],'XTickLabel',{'','Baseline','','Adaptation','','Washout'});
+xline(150,'--');
+xline(1050,'--');
+ylabel("Variance")
+xlabel("Strides")
+title("EMG Asymmetry Variance")
 %% COmpare
 vizModels(model(1:5))
 %%
